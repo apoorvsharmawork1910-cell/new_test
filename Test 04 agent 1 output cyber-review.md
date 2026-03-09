@@ -1,1 +1,417 @@
-# cyber-review.md## Smart Digitization OCR with Google Cloud Vision API - Cybersecurity Review### Executive SummaryThe Smart Digitization OCR with Google Cloud Vision API project integrates Google Cloud Vision API into HP's AI Vectorize solution to enhance text extraction capabilities from Architecture, Engineering, and Construction (AEC) documents. This solution processes raster and PDF-based technical documents, converting them into editable CAD drawings for the HP Build Workspace portal.The integration supports 30+ languages, handles rotated and handwritten text, and processes complex AEC documents including floorplans, mechanical drawings, and elevation plans. The solution is designed to impact 40% of projected 2026 revenue for AEC vectorization, with expected processing volumes scaling from 1.3K files per month currently to 61K files by Q4 2026.**Overall Risk Rating: MEDIUM**---## System Overview### System PurposeConvert raster and PDF-based technical documents into editable CAD drawings using Google Cloud Vision API for OCR text extraction, targeting AEC customers through the HP Build Workspace portal.### Key Components- HP Build Workspace Portal (User Interface)- AI Vectorize Pipeline (Orchestration)- OCR Service (Text Extraction Coordination)- Google Cloud Vision API (OCR Processing Engine)- AWS Infrastructure (EKS, S3, Secrets Manager)- Monitoring Systems (Splunk, Prometheus, DynamoDB)### End Users- AEC professionals (architects, engineers, contractors)- Construction project managers- Technical drafters and designers---## Scope### In Scope- Integration of Google Cloud Vision API within AI Vectorize pipeline- OCR text extraction with confidence scoring and bounding box coordinates- Support for 30+ languages including Latin, Cyrillic, Arabic, and East Asian scripts- Processing of AEC documents (floorplans, mechanical drawings, elevation plans)- Authentication and authorization with Google Cloud services- Data protection and privacy compliance measures- Quality evaluation and monitoring processes### Out of Scope- Custom OCR model training or fine-tuning- Alternative OCR service implementations- Direct user identity management (handled by HP Build Workspace)- Third-party data sharing beyond Google Cloud Vision API processing---## System ArchitectureThe system follows a microservices architecture deployed on AWS EKS, integrating with Google Cloud Vision API for OCR processing. The architecture includes multiple trust boundaries and implements defense-in-depth security controls.### Key Architectural Components- **Frontend**: HP Build Workspace Portal- **Orchestration**: AI Vectorize Pipeline on AWS EKS- **Processing**: OCR Service, Image Processing, ML Engine- **Storage**: AWS S3 for file storage- **Security**: AWS IAM, Secrets Manager, WAF- **External**: Google Cloud Vision API- **Monitoring**: Splunk, Prometheus, DynamoDB---## C4 Architecture Diagram```mermaidgraph TB    subgraph "HP Build Workspace"        User[AEC Professional]        Portal[HP Build Workspace Portal]    end        subgraph "AWS Infrastructure"        subgraph "EKS Cluster"            Pipeline[AI Vectorize Pipeline]            OCR[OCR Service]            FileAnalyzer[File Analyzer]            ImageProc[Image Processing]            MLEngine[ML Engine]        end                S3[S3 Storage]        Secrets[AWS Secrets Manager]        IAM[AWS IAM]    end        subgraph "Google Cloud"        Vision[Google Cloud Vision API]    end        subgraph "Monitoring"        Splunk[Splunk Logging]        Prometheus[Prometheus Metrics]        DynamoDB[DynamoDB Tracking]    end        User --&gt; Portal    Portal --&gt; Pipeline    Pipeline --&gt; FileAnalyzer    FileAnalyzer --&gt; ImageProc    ImageProc --&gt; OCR    OCR --&gt; Vision    Vision --&gt; OCR    OCR --&gt; MLEngine    MLEngine --&gt; S3        OCR --&gt; Secrets    Pipeline --&gt; IAM    Pipeline --&gt; Splunk    Pipeline --&gt; Prometheus    Pipeline --&gt; DynamoDB```---## Data Flow Diagram```mermaidsequenceDiagram    participant User as AEC Professional    participant Portal as HP Build Workspace    participant Pipeline as AI Vectorize Pipeline    participant OCR as OCR Service    participant Vision as Google Cloud Vision API    participant S3 as AWS S3        User-&gt;&gt;Portal: Upload AEC Document    Portal-&gt;&gt;Pipeline: Trigger Vectorization Job    Pipeline-&gt;&gt;S3: Store Original File    Pipeline-&gt;&gt;OCR: Process Document    OCR-&gt;&gt;Vision: Send Image for OCR    Vision-&gt;&gt;OCR: Return Text + Coordinates + Confidence    OCR-&gt;&gt;Pipeline: Processed Text Data    Pipeline-&gt;&gt;Pipeline: Vectorization Processing    Pipeline-&gt;&gt;S3: Store Results (SVG/DXF)    Pipeline-&gt;&gt;Portal: Job Complete Notification    Portal-&gt;&gt;User: Download Vectorized File```---## Open Ports and Network Interfaces| Service | Protocol | Port | Purpose | Security ||---------|----------|------|---------|----------|| Google Cloud Vision API | HTTPS | 443 | OCR API calls | TLS 1.2+ || AWS EKS API | HTTPS | 443 | Kubernetes management | AWS IAM || AWS S3 | HTTPS | 443 | File storage access | AWS IAM || Splunk | HTTPS | 8088 | Log ingestion | Token-based || Prometheus | HTTP | 9090 | Metrics collection | Internal only |---## Security Configurations### Firewall and Network Security- **Web Application Firewall (WAF)**: Deployed for centralized protection per APP_06_02- **Network Segmentation**: EKS cluster isolated with security groups- **API Gateway**: Rate limiting and request validation- **VPC Configuration**: Private subnets for processing components### Hardening Measures- **Container Security**: Minimal base images with security scanning- **Access Controls**: Role-based access with least privilege principle per APP_01_10- **Network Policies**: Kubernetes network policies restricting pod communication- **Security Groups**: AWS security groups limiting ingress/egress traffic### Authentication Mechanisms- **Google Cloud**: OAuth2 with service account credentials- **AWS Services**: IAM roles and policies- **HP Build Workspace**: HP OneUID with Ping MFA integration per APP_01_03- **API Authentication**: Token-based authentication for internal services---## Data Protection### Encryption Standards#### Encryption in Transit- **TLS 1.2+** for all external API communications per APP_02_01- **HTTPS** for all web interfaces and API endpoints- **AWS VPC encryption** for internal service communication#### Encryption at Rest- **AWS S3**: AES-256 server-side encryption per APP_02_01- **EKS Secrets**: Kubernetes secrets encrypted with AWS KMS- **Database**: DynamoDB encryption at rest enabled### Sensitive Data Types- **User Files**: AEC documents potentially containing company information- **API Credentials**: Google Cloud service account keys- **Processing Metadata**: File names, user identifiers, processing results### Credential and Key Protection- **AWS Secrets Manager**: Secure storage of Google Cloud credentials- **Key Rotation**: Annual rotation for symmetric keys per APP_02_02, bi-annual for asymmetric- **Access Logging**: All credential access logged and monitored### Certificate Management- **Public CA**: For internet-facing endpoints per APP_02_03- **AWS Certificate Manager**: SSL/TLS certificate management- **Google Cloud**: Managed certificates for API endpoints---## Authentication and Authorization Model### Role-Based Access Control (RBAC)| Role | Access Level | Permissions ||------|-------------|-------------|| AEC Professional | User | Upload files, view results, provide feedback || System Administrator | Admin | Manage pipeline, view logs, configure settings || Developer | Developer | Deploy code, access development environments || Security Analyst | Security | View security logs, conduct audits |### Authentication Requirements- **Employees**: HP OneUID with Ping MFA for external access per APP_01_01, APP_01_03- **Customers**: HP ID with enforced MFA per APP_01_04- **Service Accounts**: OAuth2 with Google Cloud Vision API- **Internal Services**: AWS IAM roles with least privilege per APP_01_06### Session Management- **High-Risk Sessions**: 1-hour inactivity timeout, 8-hour maximum per APP_03_01- **Medium-Risk Sessions**: 24-hour inactivity timeout, 6-day maximum per APP_03_02- **Token Validation**: JWT tokens with complex signing keys per APP_02_06---## STRIDE Threat Summary| Threat Category | Risk Description | Likelihood | Impact | Risk Level | Mitigation Strategy ||-----------------|------------------|------------|--------|------------|-------------------|| **Spoofing** | Unauthorized access to Google Cloud Vision API | Low | High | Medium | OAuth2 authentication, service account key rotation || **Tampering** | Modification of files during processing | Low | High | Medium | File integrity checks, secure transport (TLS) || **Repudiation** | Denial of file processing activities | Low | Medium | Low | Comprehensive audit logging, digital signatures || **Information Disclosure** | Exposure of sensitive document content | Medium | High | High | Encryption in transit/rest, data anonymization || **Denial of Service** | API rate limiting or service unavailability | Medium | Medium | Medium | Rate limiting, circuit breakers, fallback mechanisms || **Elevation of Privilege** | Unauthorized access to AWS resources | Low | High | Medium | IAM least privilege, regular access reviews |---## Trust Boundaries```mermaidgraph TB    subgraph "Untrusted Zone"        Internet[Internet]        Attackers[Potential Attackers]    end        subgraph "DMZ - Trusted External"        WAF[Web Application Firewall]        LoadBalancer[Load Balancer]    end        subgraph "HP Internal Network - Trusted"        Portal[HP Build Workspace]        Auth[HP OneUID/Ping MFA]    end        subgraph "AWS Private Cloud - Highly Trusted"        VPC[AWS VPC]        subgraph "EKS Cluster"            Pipeline[AI Vectorize Pipeline]            OCR[OCR Service]        end        S3[S3 Storage]        Secrets[Secrets Manager]    end        subgraph "Google Cloud - External Trusted"        Vision[Google Cloud Vision API]    end        Internet --&gt; WAF    WAF --&gt; LoadBalancer    LoadBalancer --&gt; Portal    Portal --&gt; Auth    Auth --&gt; Pipeline    Pipeline --&gt; OCR    OCR --&gt; Vision    Pipeline --&gt; S3    Pipeline --&gt; Secrets```### Trust Boundary Controls| Boundary | Security Controls | Validation Methods ||----------|------------------|-------------------|| Internet → DMZ | WAF, DDoS protection, rate limiting | Traffic analysis, threat detection || DMZ → HP Network | Authentication, authorization, SSL/TLS | Identity verification, certificate validation || HP Network → AWS | VPN/Private connectivity, IAM roles | Network monitoring, access logging || AWS → Google Cloud | OAuth2, API keys, encrypted transport | Token validation, audit logging |---## Attack Trees```mermaidgraph TD    Root[Compromise OCR System]        Root --&gt; A1[Steal Sensitive Documents]    Root --&gt; A2[Disrupt Service Operations]    Root --&gt; A3[Gain Unauthorized Access]        A1 --&gt; B1[Intercept API Calls]    A1 --&gt; B2[Access S3 Storage]    A1 --&gt; B3[Compromise Google Vision]        A2 --&gt; C1[DDoS Attack]    A2 --&gt; C2[Resource Exhaustion]    A2 --&gt; C3[API Rate Limiting]        A3 --&gt; D1[Credential Theft]    A3 --&gt; D2[Privilege Escalation]    A3 --&gt; D3[Container Escape]        B1 --&gt; E1[Man-in-Middle Attack]    B1 --&gt; E2[Certificate Spoofing]        B2 --&gt; F1[IAM Role Compromise]    B2 --&gt; F2[S3 Bucket Misconfiguration]        D1 --&gt; G1[Service Account Key Theft]    D1 --&gt; G2[AWS Credential Compromise]```---## Auditing and Logging### Logging Requirements per APP_05_01- **Authentication Events**: Success and failure of user authentication requests- **User Management**: On-boarding, profile changes, and off-boarding- **Failed Login Attempts**: Number of failed login attempts tracked- **Account Management**: Locking and unlocking of user accounts- **Configuration Changes**: Application configuration and connectivity changes- **Service Events**: Starting and stopping of application services and components### Log Details per APP_05_02- **User Identifier**: Unique user identification- **Timestamp**: Precise time of event occurrence- **Source IP Address**: True source IP (not load balancer IP)- **Event Name**: Descriptive event identification- **Result**: Success or failure status- **Admin Functionality**: Administrative access and changes### Log Management- **Centralized Logging**: Splunk for log aggregation and analysis- **Retention**: Security logs retained for 7 years, application logs for 1 year per APP_05_05- **Sensitive Data**: No passwords, secret keys, or tokens logged per APP_05_03- **SIEM Integration**: Exportable to SIEM tools per APP_05_04---## System and Penetration Testing### Static Application Security Testing (SAST)- **Tools Used**: SonarQube, Veracode- **Coverage**: Python codebase, configuration files- **Frequency**: Every code commit, pre-deployment- **Thresholds**: No critical or high-severity issues### Dynamic Application Security Testing (DAST)- **Tools Used**: OWASP ZAP, Burp Suite- **Scope**: Web interfaces, API endpoints- **Frequency**: Weekly automated scans, quarterly manual testing- **Focus Areas**: Authentication bypass, injection attacks, XSS### Vulnerability Management per APP_09_01- **Zero-Day**: 24-48 hours from patch availability- **Critical**: Within 15 calendar days- **High**: Within 30 calendar days- **Medium**: Within 45 calendar days- **Low**: Within 60 calendar days### Security Testing Tools| Tool Category | Tool Name | Purpose | Frequency ||---------------|-----------|---------|-----------|| SAST | SonarQube | Code quality and security | Per commit || SAST | Veracode | Binary analysis | Pre-release || DAST | OWASP ZAP | Web application testing | Weekly || Container Security | Trivy | Container vulnerability scanning | Daily || Dependency Check | Snyk | Third-party library vulnerabilities | Daily |---## Traceability Matrix| Requirement ID | HP Cybersecurity Requirement | Security Control | Implementation | Verification Method ||----------------|------------------------------|------------------|----------------|-------------------|| APP_01_01 | User Authentication | HP OneUID integration | SAML/OAuth integration | Authentication testing || APP_01_03 | MFA for External Access | Ping MFA enforcement | Multi-factor authentication | MFA validation testing || APP_01_06 | Role-Based Access Control | RBAC implementation | Kubernetes RBAC, AWS IAM | Access control testing || APP_02_01 | Approved Cryptography | AES-256, TLS 1.2+ | Encryption implementation | Cryptographic validation || APP_02_02 | Key Rotation | Annual symmetric key rotation | AWS Secrets Manager | Key rotation verification || APP_02_03 | Digital Certificates | Public CA certificates | AWS Certificate Manager | Certificate validation || APP_05_01 | Security Event Logging | Comprehensive audit logging | Splunk integration | Log analysis validation || APP_05_05 | Log Retention | 1-year minimum retention | Automated retention policies | Retention policy verification || APP_06_02 | Web Application Firewall | WAF deployment | AWS WAF implementation | WAF configuration review || APP_09_01 | Patch Management | Vulnerability remediation timelines | Automated patching processes | Patch compliance verification |---**Document Version:** 1.0  **Last Updated:** February 13, 2026  **Next Review:** Q3 2026  **Classification:** HP Confidential
+# cyber-review.md
+
+## Smart Digitization OCR with Google Cloud Vision API - Cybersecurity Review
+
+### Executive Summary
+
+The Smart Digitization OCR with Google Cloud Vision API project integrates Google Cloud Vision API into HP's AI Vectorize solution to enhance text extraction capabilities from Architecture, Engineering, and Construction (AEC) documents. This solution processes raster and PDF-based technical documents, converting them into editable CAD drawings for the HP Build Workspace portal.
+
+The integration supports 30+ languages, handles rotated and handwritten text, and processes complex AEC documents including floorplans, mechanical drawings, and elevation plans. The solution is designed to impact 40% of projected 2026 revenue for AEC vectorization, with expected processing volumes scaling from 1.3K files per month currently to 61K files by Q4 2026.
+
+**Overall Risk Rating: MEDIUM**
+
+---
+
+## System Overview
+
+### System Purpose
+Convert raster and PDF-based technical documents into editable CAD drawings using Google Cloud Vision API for OCR text extraction, targeting AEC customers through the HP Build Workspace portal.
+
+### Key Components
+- HP Build Workspace Portal (User Interface)
+- AI Vectorize Pipeline (Orchestration)
+- OCR Service (Text Extraction Coordination)
+- Google Cloud Vision API (OCR Processing Engine)
+- AWS Infrastructure (EKS, S3, Secrets Manager)
+- Monitoring Systems (Splunk, Prometheus, DynamoDB)
+
+### End Users
+- AEC professionals (architects, engineers, contractors)
+- Construction project managers
+- Technical drafters and designers
+
+---
+
+## Scope
+
+### In Scope
+- Integration of Google Cloud Vision API within AI Vectorize pipeline
+- OCR text extraction with confidence scoring and bounding box coordinates
+- Support for 30+ languages including Latin, Cyrillic, Arabic, and East Asian scripts
+- Processing of AEC documents (floorplans, mechanical drawings, elevation plans)
+- Authentication and authorization with Google Cloud services
+- Data protection and privacy compliance measures
+- Quality evaluation and monitoring processes
+
+### Out of Scope
+- Custom OCR model training or fine-tuning
+- Alternative OCR service implementations
+- Direct user identity management (handled by HP Build Workspace)
+- Third-party data sharing beyond Google Cloud Vision API processing
+
+---
+
+## System Architecture
+
+The system follows a microservices architecture deployed on AWS EKS, integrating with Google Cloud Vision API for OCR processing. The architecture includes multiple trust boundaries and implements defense-in-depth security controls.
+
+### Key Architectural Components
+- **Frontend**: HP Build Workspace Portal
+- **Orchestration**: AI Vectorize Pipeline on AWS EKS
+- **Processing**: OCR Service, Image Processing, ML Engine
+- **Storage**: AWS S3 for file storage
+- **Security**: AWS IAM, Secrets Manager, WAF
+- **External**: Google Cloud Vision API
+- **Monitoring**: Splunk, Prometheus, DynamoDB
+
+---
+
+## C4 Architecture Diagram
+
+```mermaid
+graph TB
+    subgraph "HP Build Workspace"
+        User[AEC Professional]
+        Portal[HP Build Workspace Portal]
+    end
+    
+    subgraph "AWS Infrastructure"
+        subgraph "EKS Cluster"
+            Pipeline[AI Vectorize Pipeline]
+            OCR[OCR Service]
+            FileAnalyzer[File Analyzer]
+            ImageProc[Image Processing]
+            MLEngine[ML Engine]
+        end
+        
+        S3[S3 Storage]
+        Secrets[AWS Secrets Manager]
+        IAM[AWS IAM]
+    end
+    
+    subgraph "Google Cloud"
+        Vision[Google Cloud Vision API]
+    end
+    
+    subgraph "Monitoring"
+        Splunk[Splunk Logging]
+        Prometheus[Prometheus Metrics]
+        DynamoDB[DynamoDB Tracking]
+    end
+    
+    User --> Portal
+    Portal --> Pipeline
+    Pipeline --> FileAnalyzer
+    FileAnalyzer --> ImageProc
+    ImageProc --> OCR
+    OCR --> Vision
+    Vision --> OCR
+    OCR --> MLEngine
+    MLEngine --> S3
+    
+    OCR --> Secrets
+    Pipeline --> IAM
+    Pipeline --> Splunk
+    Pipeline --> Prometheus
+    Pipeline --> DynamoDB
+```
+
+---
+
+## Data Flow Diagram
+
+```mermaid
+sequenceDiagram
+    participant User as AEC Professional
+    participant Portal as HP Build Workspace
+    participant Pipeline as AI Vectorize Pipeline
+    participant OCR as OCR Service
+    participant Vision as Google Cloud Vision API
+    participant S3 as AWS S3
+    
+    User->>Portal: Upload AEC Document
+    Portal->>Pipeline: Trigger Vectorization Job
+    Pipeline->>S3: Store Original File
+    Pipeline->>OCR: Process Document
+    OCR->>Vision: Send Image for OCR
+    Vision->>OCR: Return Text + Coordinates + Confidence
+    OCR->>Pipeline: Processed Text Data
+    Pipeline->>Pipeline: Vectorization Processing
+    Pipeline->>S3: Store Results (SVG/DXF)
+    Pipeline->>Portal: Job Complete Notification
+    Portal->>User: Download Vectorized File
+```
+
+---
+
+## Open Ports and Network Interfaces
+
+| Service | Protocol | Port | Purpose | Security |
+|---------|----------|------|---------|----------|
+| Google Cloud Vision API | HTTPS | 443 | OCR API calls | TLS 1.2+ |
+| AWS EKS API | HTTPS | 443 | Kubernetes management | AWS IAM |
+| AWS S3 | HTTPS | 443 | File storage access | AWS IAM |
+| Splunk | HTTPS | 8088 | Log ingestion | Token-based |
+| Prometheus | HTTP | 9090 | Metrics collection | Internal only |
+
+---
+
+## Security Configurations
+
+### Firewall and Network Security
+- **Web Application Firewall (WAF)**: Deployed for centralized protection per APP_06_02
+- **Network Segmentation**: EKS cluster isolated with security groups
+- **API Gateway**: Rate limiting and request validation
+- **VPC Configuration**: Private subnets for processing components
+
+### Hardening Measures
+- **Container Security**: Minimal base images with security scanning
+- **Access Controls**: Role-based access with least privilege principle per APP_01_10
+- **Network Policies**: Kubernetes network policies restricting pod communication
+- **Security Groups**: AWS security groups limiting ingress/egress traffic
+
+### Authentication Mechanisms
+- **Google Cloud**: OAuth2 with service account credentials
+- **AWS Services**: IAM roles and policies
+- **HP Build Workspace**: HP OneUID with Ping MFA integration per APP_01_03
+- **API Authentication**: Token-based authentication for internal services
+
+---
+
+## Data Protection
+
+### Encryption Standards
+
+#### Encryption in Transit
+- **TLS 1.2+** for all external API communications per APP_02_01
+- **HTTPS** for all web interfaces and API endpoints
+- **AWS VPC encryption** for internal service communication
+
+#### Encryption at Rest
+- **AWS S3**: AES-256 server-side encryption per APP_02_01
+- **EKS Secrets**: Kubernetes secrets encrypted with AWS KMS
+- **Database**: DynamoDB encryption at rest enabled
+
+### Sensitive Data Types
+- **User Files**: AEC documents potentially containing company information
+- **API Credentials**: Google Cloud service account keys
+- **Processing Metadata**: File names, user identifiers, processing results
+
+### Credential and Key Protection
+- **AWS Secrets Manager**: Secure storage of Google Cloud credentials
+- **Key Rotation**: Annual rotation for symmetric keys per APP_02_02, bi-annual for asymmetric
+- **Access Logging**: All credential access logged and monitored
+
+### Certificate Management
+- **Public CA**: For internet-facing endpoints per APP_02_03
+- **AWS Certificate Manager**: SSL/TLS certificate management
+- **Google Cloud**: Managed certificates for API endpoints
+
+---
+
+## Authentication and Authorization Model
+
+### Role-Based Access Control (RBAC)
+
+| Role | Access Level | Permissions |
+|------|-------------|-------------|
+| AEC Professional | User | Upload files, view results, provide feedback |
+| System Administrator | Admin | Manage pipeline, view logs, configure settings |
+| Developer | Developer | Deploy code, access development environments |
+| Security Analyst | Security | View security logs, conduct audits |
+
+### Authentication Requirements
+- **Employees**: HP OneUID with Ping MFA for external access per APP_01_01, APP_01_03
+- **Customers**: HP ID with enforced MFA per APP_01_04
+- **Service Accounts**: OAuth2 with Google Cloud Vision API
+- **Internal Services**: AWS IAM roles with least privilege per APP_01_06
+
+### Session Management
+- **High-Risk Sessions**: 1-hour inactivity timeout, 8-hour maximum per APP_03_01
+- **Medium-Risk Sessions**: 24-hour inactivity timeout, 6-day maximum per APP_03_02
+- **Token Validation**: JWT tokens with complex signing keys per APP_02_06
+
+---
+
+## STRIDE Threat Summary
+
+| Threat Category | Risk Description | Likelihood | Impact | Risk Level | Mitigation Strategy |
+|-----------------|------------------|------------|--------|------------|-------------------|
+| **Spoofing** | Unauthorized access to Google Cloud Vision API | Low | High | Medium | OAuth2 authentication, service account key rotation |
+| **Tampering** | Modification of files during processing | Low | High | Medium | File integrity checks, secure transport (TLS) |
+| **Repudiation** | Denial of file processing activities | Low | Medium | Low | Comprehensive audit logging, digital signatures |
+| **Information Disclosure** | Exposure of sensitive document content | Medium | High | High | Encryption in transit/rest, data anonymization |
+| **Denial of Service** | API rate limiting or service unavailability | Medium | Medium | Medium | Rate limiting, circuit breakers, fallback mechanisms |
+| **Elevation of Privilege** | Unauthorized access to AWS resources | Low | High | Medium | IAM least privilege, regular access reviews |
+
+---
+
+## Trust Boundaries
+
+```mermaid
+graph TB
+    subgraph "Untrusted Zone"
+        Internet[Internet]
+        Attackers[Potential Attackers]
+    end
+    
+    subgraph "DMZ - Trusted External"
+        WAF[Web Application Firewall]
+        LoadBalancer[Load Balancer]
+    end
+    
+    subgraph "HP Internal Network - Trusted"
+        Portal[HP Build Workspace]
+        Auth[HP OneUID/Ping MFA]
+    end
+    
+    subgraph "AWS Private Cloud - Highly Trusted"
+        VPC[AWS VPC]
+        subgraph "EKS Cluster"
+            Pipeline[AI Vectorize Pipeline]
+            OCR[OCR Service]
+        end
+        S3[S3 Storage]
+        Secrets[Secrets Manager]
+    end
+    
+    subgraph "Google Cloud - External Trusted"
+        Vision[Google Cloud Vision API]
+    end
+    
+    Internet --> WAF
+    WAF --> LoadBalancer
+    LoadBalancer --> Portal
+    Portal --> Auth
+    Auth --> Pipeline
+    Pipeline --> OCR
+    OCR --> Vision
+    Pipeline --> S3
+    Pipeline --> Secrets
+```
+
+### Trust Boundary Controls
+
+| Boundary | Security Controls | Validation Methods |
+|----------|------------------|-------------------|
+| Internet → DMZ | WAF, DDoS protection, rate limiting | Traffic analysis, threat detection |
+| DMZ → HP Network | Authentication, authorization, SSL/TLS | Identity verification, certificate validation |
+| HP Network → AWS | VPN/Private connectivity, IAM roles | Network monitoring, access logging |
+| AWS → Google Cloud | OAuth2, API keys, encrypted transport | Token validation, audit logging |
+
+---
+
+## Attack Trees
+
+```mermaid
+graph TD
+    Root[Compromise OCR System]
+    
+    Root --> A1[Steal Sensitive Documents]
+    Root --> A2[Disrupt Service Operations]
+    Root --> A3[Gain Unauthorized Access]
+    
+    A1 --> B1[Intercept API Calls]
+    A1 --> B2[Access S3 Storage]
+    A1 --> B3[Compromise Google Vision]
+    
+    A2 --> C1[DDoS Attack]
+    A2 --> C2[Resource Exhaustion]
+    A2 --> C3[API Rate Limiting]
+    
+    A3 --> D1[Credential Theft]
+    A3 --> D2[Privilege Escalation]
+    A3 --> D3[Container Escape]
+    
+    B1 --> E1[Man-in-Middle Attack]
+    B1 --> E2[Certificate Spoofing]
+    
+    B2 --> F1[IAM Role Compromise]
+    B2 --> F2[S3 Bucket Misconfiguration]
+    
+    D1 --> G1[Service Account Key Theft]
+    D1 --> G2[AWS Credential Compromise]
+```
+
+---
+
+## Auditing and Logging
+
+### Logging Requirements per APP_05_01
+- **Authentication Events**: Success and failure of user authentication requests
+- **User Management**: On-boarding, profile changes, and off-boarding
+- **Failed Login Attempts**: Number of failed login attempts tracked
+- **Account Management**: Locking and unlocking of user accounts
+- **Configuration Changes**: Application configuration and connectivity changes
+- **Service Events**: Starting and stopping of application services and components
+
+### Log Details per APP_05_02
+- **User Identifier**: Unique user identification
+- **Timestamp**: Precise time of event occurrence
+- **Source IP Address**: True source IP (not load balancer IP)
+- **Event Name**: Descriptive event identification
+- **Result**: Success or failure status
+- **Admin Functionality**: Administrative access and changes
+
+### Log Management
+- **Centralized Logging**: Splunk for log aggregation and analysis
+- **Retention**: Security logs retained for 7 years, application logs for 1 year per APP_05_05
+- **Sensitive Data**: No passwords, secret keys, or tokens logged per APP_05_03
+- **SIEM Integration**: Exportable to SIEM tools per APP_05_04
+
+---
+
+## System and Penetration Testing
+
+### Static Application Security Testing (SAST)
+- **Tools Used**: SonarQube, Veracode
+- **Coverage**: Python codebase, configuration files
+- **Frequency**: Every code commit, pre-deployment
+- **Thresholds**: No critical or high-severity issues
+
+### Dynamic Application Security Testing (DAST)
+- **Tools Used**: OWASP ZAP, Burp Suite
+- **Scope**: Web interfaces, API endpoints
+- **Frequency**: Weekly automated scans, quarterly manual testing
+- **Focus Areas**: Authentication bypass, injection attacks, XSS
+
+### Vulnerability Management per APP_09_01
+- **Zero-Day**: 24-48 hours from patch availability
+- **Critical**: Within 15 calendar days
+- **High**: Within 30 calendar days
+- **Medium**: Within 45 calendar days
+- **Low**: Within 60 calendar days
+
+### Security Testing Tools
+
+| Tool Category | Tool Name | Purpose | Frequency |
+|---------------|-----------|---------|-----------|
+| SAST | SonarQube | Code quality and security | Per commit |
+| SAST | Veracode | Binary analysis | Pre-release |
+| DAST | OWASP ZAP | Web application testing | Weekly |
+| Container Security | Trivy | Container vulnerability scanning | Daily |
+| Dependency Check | Snyk | Third-party library vulnerabilities | Daily |
+
+---
+
+## Traceability Matrix
+
+| Requirement ID | HP Cybersecurity Requirement | Security Control | Implementation | Verification Method |
+|----------------|------------------------------|------------------|----------------|-------------------|
+| APP_01_01 | User Authentication | HP OneUID integration | SAML/OAuth integration | Authentication testing |
+| APP_01_03 | MFA for External Access | Ping MFA enforcement | Multi-factor authentication | MFA validation testing |
+| APP_01_06 | Role-Based Access Control | RBAC implementation | Kubernetes RBAC, AWS IAM | Access control testing |
+| APP_02_01 | Approved Cryptography | AES-256, TLS 1.2+ | Encryption implementation | Cryptographic validation |
+| APP_02_02 | Key Rotation | Annual symmetric key rotation | AWS Secrets Manager | Key rotation verification |
+| APP_02_03 | Digital Certificates | Public CA certificates | AWS Certificate Manager | Certificate validation |
+| APP_05_01 | Security Event Logging | Comprehensive audit logging | Splunk integration | Log analysis validation |
+| APP_05_05 | Log Retention | 1-year minimum retention | Automated retention policies | Retention policy verification |
+| APP_06_02 | Web Application Firewall | WAF deployment | AWS WAF implementation | WAF configuration review |
+| APP_09_01 | Patch Management | Vulnerability remediation timelines | Automated patching processes | Patch compliance verification |
+
+---
+
+**Document Version:** 1.0  
+**Last Updated:** February 13, 2026  
+**Next Review:** Q3 2026  
+**Classification:** HP Confidential
